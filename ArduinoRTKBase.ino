@@ -14,8 +14,8 @@ SFE_UBLOX_REDUCED_PROG_MEM
 //#define SFE_UBLOX_REDUCED_PROG_MEM // Uncommenting this line will delete the minor debug messages to save memory
 //#define SFE_UBLOX_DISABLE_AUTO_NMEA // Uncommenting this line will disable auto-NMEA support to save memory
 
-RF24 radio(7, 6); // CE, CSN
-const byte addresses[][6] = {"00001", "00002"};
+RF24 radio(8, 7); // CE, CSN
+uint8_t addresses[][6] = { "Base", "Rover" };
 
 
 static float accuracy = 30.000; //2.0
@@ -28,8 +28,8 @@ void setup()
   Serial.println(F("u-blox NEO-M8P-2 base station"));
 
   radio.begin();
-  radio.openWritingPipe(addresses[1]); // 00002
-  radio.openReadingPipe(1, addresses[0]); // 00001
+  radio.openWritingPipe(addresses[1]);    // Rover
+  radio.openReadingPipe(1, addresses[0]); // Base
   radio.setPALevel(RF24_PA_MIN);
 
   if(radio.isChipConnected()){
@@ -158,6 +158,11 @@ void loop()
   radio.write(&text, sizeof(text));
   delay(5);
   radio.startListening();
+  if (radio.available()) {
+    char text_incoming[32] = "";
+    radio.read(&text_incoming, sizeof(text_incoming));
+    Serial.println(text_incoming);
+  }
   
 }
 
