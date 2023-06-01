@@ -15,6 +15,7 @@ SFE_UBLOX_REDUCED_PROG_MEM
 //#define SFE_UBLOX_DISABLE_AUTO_NMEA // Uncommenting this line will disable auto-NMEA support to save memory
 
 RF24 radio(8, 7); // CE, CSN
+
 uint8_t addresses[][6] = { "Base", "Rover" };
 
 
@@ -55,7 +56,7 @@ void setup()
 
   myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); // Ensure RTCM3 is enabled
   myGNSS.saveConfiguration(); //Save the current settings to flash and BBR
-
+  
   while (Serial.available()) Serial.read(); //Clear any latent chars in serial buffer
 
   //Serial.println(F("Press any key to send commands to begin Survey-In"));
@@ -68,6 +69,7 @@ void setup()
   // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
   // You can either read the data from packetUBXNAVSVIN directly
   // or can use the helper functions: getSurveyInActive; getSurveyInValid; getSurveyInObservationTime; and getSurveyInMeanAccuracy
+  
   response = myGNSS.getSurveyStatus(2000); //Query module for SVIN status with 2000ms timeout (request can take a long time)
 
   if (response == false) // Check if fresh data was received
@@ -93,8 +95,9 @@ void setup()
   }
 
   while (Serial.available()) Serial.read(); //Clear buffer
-
+  
   //Begin waiting for survey to complete
+  
   while (myGNSS.getSurveyInValid() == false) // Call the helper function
   {
     if (Serial.available())
@@ -108,7 +111,7 @@ void setup()
         break;
       }
     }
-
+    
     // From v2.0, the data from getSurveyStatus (UBX-NAV-SVIN) is returned in UBX_NAV_SVIN_t packetUBXNAVSVIN
     // Please see u-blox_structs.h for the full definition of UBX_NAV_SVIN_t
     // You can either read the data from packetUBXNAVSVIN directly
@@ -150,10 +153,12 @@ void setup()
   }
 
   Serial.println(F("Base survey complete! RTCM now broadcasting."));
+  
 }
 
 void loop()
 {
+  
   myGNSS.checkUblox(); //See if new data is available. Process bytes as they come in.
   delay(250); //Don't pound too hard on the I2C bus
 
