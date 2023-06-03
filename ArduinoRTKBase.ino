@@ -21,30 +21,40 @@ uint8_t addresses[][6] = { "Base", "Rover" };
 
 static float accuracy = 30.000; //2.0
 static int   mintime = 10; //300
-static uint8_t rtk_frame[32] = "";
+static uint8_t rtk_frame_data[200] = "";
+static uint8_t rtk_frame_size = 0 ;
 
+
+struct Data_Package {
+  byte    data_type = 0;
+  byte    data_size = 0;
+  byte    data_appendnext = 0;
+  uint8_t data[28];
+};
+
+Data_Package radio_data;
 
 void setup()
 {
 
-  memset(rtk_frame,0,32);
+  memset(rtk_frame_data,0,200);
   
   Serial.begin(115200);
   while (!Serial); //Wait for user to open terminal
-  Serial.println(F("u-blox NEO-M8P-2 base station"));
+  Serial.println(F("u-blox NEO-M8P-2 Base Station"));
 
-  radio.begin();
-  radio.openWritingPipe(addresses[1]);    // Rover
-  radio.openReadingPipe(1, addresses[0]); // Base
-  radio.setPALevel(RF24_PA_MIN);
-
+  //radio.begin();
+  //radio.openWritingPipe(addresses[1]);    // Rover
+  //radio.openReadingPipe(1, addresses[0]); // Base
+  //radio.setPALevel(RF24_PA_MIN);
+/*
   if(radio.isChipConnected()){
     Serial.println(F("RF24 Initialized!"));
   }else{
     Serial.println(F("Error: RF24 not connected!"));
   }
   
-
+*/
   Wire.begin();
   Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 
@@ -58,9 +68,6 @@ void setup()
   myGNSS.saveConfiguration(); //Save the current settings to flash and BBR
   
   while (Serial.available()) Serial.read(); //Clear any latent chars in serial buffer
-
-  //Serial.println(F("Press any key to send commands to begin Survey-In"));
-  //while (Serial.available() == 0) ; //Wait for user to press a key
 
   bool response;
 
@@ -162,33 +169,56 @@ void loop()
   myGNSS.checkUblox(); //See if new data is available. Process bytes as they come in.
   delay(250); //Don't pound too hard on the I2C bus
 
-  if(rtk_frame[0]!=0){
-      Serial.println("---");
-      for(int i=1;i<(rtk_frame[0]+1);i++){
-        if (rtk_frame[i] < 0x10) Serial.print(F("0"));  //WTF work around for eroneus HEX printing
-        Serial.print(rtk_frame[i], HEX);
+  if(rtk_frame_size!=0){
+      Serial.print("RTCM Message size: ");
+      Serial.print(rtk_frame_size);
+      Serial.print(" data: ");     
+      for(int i=0;i<rtk_frame_size;i++){
+        if (rtk_frame_data[i] < 0x10) Serial.print(F("0"));  //WTF work around for eroneus HEX printing
+        Serial.print(rtk_frame_data[i], HEX);
       }
        Serial.println("");
-       radio.stopListening();
-       radio.write(&rtk_frame[1], rtk_frame[0]);
-       delay(5);
-       radio.startListening();
-       memset(rtk_frame,0,32);
+
+      int index = 0;
+      while(rtk_frame_size>0){
+        radio_data.data_type=1;
+        if(rtk_frame_size>28){
+            radio_data.data_appendnext=1;
+            radio_data.data_size=28;
+            memcpy(radio_data.data, &rtk_frame[index], 28);
+            rtk_frame_size-=28;
+            index+=28;
+        }else{
+            radio_data.data_appendnext=0;
+            radio_data.data_size=rtk_frame_size;
+            memcpy(radio_data.data, &rtk_frame[index], rtk_frame_size);
+            index+=rtk_frame_size;
+            rtk_frame_size-=rtk_frame_size;
+        }
+
+        radio.stopListening();
+        radio.write(&radio_data, sizeof(Data_Package));
+        delay(5);
+        radio.startListening();
+        delay(5);
+        
+      }
+      memset(rtk_frame_data,0,200);
     }
 
-    delay(5);
-    radio.stopListening();
-    const char text[] = "Hello World from RTK Base";
-    radio.write(&text, sizeof(text));
-    delay(5);
-    radio.startListening();
-    
+    //delay(5);
+    //radio.stopListening();
+    //const char text[] = "Hello World from RTK Base";
+    //radio.write(&text, sizeof(text));
+    //delay(5);
+    //radio.startListening();
+/*    
   if (radio.available()) {
     char text_incoming[32] = "";
     radio.read(&text_incoming, sizeof(text_incoming));
     Serial.println(text_incoming);
   }
-  
+*/  
 }
 
 //This function gets called from the SparkFun u-blox Arduino Library.
@@ -197,25 +227,23 @@ void loop()
 void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming)
 {
   //Let's just pretty-print the HEX values for now
-
-   static uint8_t rtk_frame_buffer[32];
+ 
+   static uint8_t rtk_frame_buffer[200];
    static int num_bytes=0;
-   if (myGNSS.rtcmFrameCounter  == 1) {
-      Serial.println("");
-      
+   if (myGNSS.rtcmFrameCounter  == 1) {      
       if(num_bytes>0){
-        memset(rtk_frame,0,32);
-        rtk_frame_buffer[0]=num_bytes;
-        memcpy(rtk_frame, rtk_frame_buffer, 32);
-        Serial.println("copied");
+        memset(rtk_frame_data,0,200);
+        rtk_frame_size=num_bytes;
+        memcpy(rtk_frame_data, rtk_frame_buffer, 200);  
       }
       //reset 
-      memset(rtk_frame_buffer,0,32);
+      memset(rtk_frame_buffer,0,200);
       num_bytes=0;
   }
-  rtk_frame_buffer[myGNSS.rtcmFrameCounter]=incoming;
-  num_bytes++;
-  if (incoming < 0x10) Serial.print(F("0"));  //WTF work around for eroneus HEX printing
-  Serial.print(incoming, HEX);
-  
+  if (myGNSS.rtcmFrameCounter < 200) {
+    rtk_frame_buffer[myGNSS.rtcmFrameCounter-1]=incoming;
+    num_bytes++;
+  }else{
+    Serial.print("Ooops this RTCM message is too long!");
+  }
 }
