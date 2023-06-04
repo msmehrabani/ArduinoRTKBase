@@ -19,9 +19,9 @@ RF24 radio(8, 7); // CE, CSN
 uint8_t addresses[][6] = { "Base", "Rover" };
 
 
-static float accuracy = 30.000; //2.0
+static float accuracy = 5.000; //2.0
 static int   mintime = 10; //300
-static uint8_t rtk_frame_data[200] = "";
+static uint8_t rtk_frame_data[1024] = "";
 static uint8_t rtk_frame_size = 0 ;
 
 
@@ -37,24 +37,24 @@ Data_Package radio_data;
 void setup()
 {
 
-  memset(rtk_frame_data,0,200);
+  memset(rtk_frame_data,0,1024);
   
   Serial.begin(115200);
   while (!Serial); //Wait for user to open terminal
   Serial.println(F("u-blox NEO-M8P-2 Base Station"));
 
-  //radio.begin();
-  //radio.openWritingPipe(addresses[1]);    // Rover
-  //radio.openReadingPipe(1, addresses[0]); // Base
-  //radio.setPALevel(RF24_PA_MIN);
-/*
+  radio.begin();
+  radio.openWritingPipe(addresses[1]);    // Rover
+  radio.openReadingPipe(1, addresses[0]); // Base
+  radio.setPALevel(RF24_PA_MIN);
+
   if(radio.isChipConnected()){
     Serial.println(F("RF24 Initialized!"));
   }else{
     Serial.println(F("Error: RF24 not connected!"));
   }
   
-*/
+
   Wire.begin();
   Wire.setClock(400000); //Increase I2C clock speed to 400kHz
 
@@ -185,25 +185,23 @@ void loop()
         if(rtk_frame_size>28){
             radio_data.data_appendnext=1;
             radio_data.data_size=28;
-            memcpy(radio_data.data, &rtk_frame[index], 28);
+            memcpy(radio_data.data, &rtk_frame_data[index], 28);
             rtk_frame_size-=28;
             index+=28;
         }else{
             radio_data.data_appendnext=0;
             radio_data.data_size=rtk_frame_size;
-            memcpy(radio_data.data, &rtk_frame[index], rtk_frame_size);
+            memcpy(radio_data.data, &rtk_frame_data[index], rtk_frame_size);
             index+=rtk_frame_size;
             rtk_frame_size-=rtk_frame_size;
         }
-
         radio.stopListening();
         radio.write(&radio_data, sizeof(Data_Package));
         delay(5);
-        radio.startListening();
-        delay(5);
-        
       }
-      memset(rtk_frame_data,0,200);
+      radio.startListening();
+      delay(5);
+      memset(rtk_frame_data,0,1024);
     }
 
     //delay(5);
@@ -228,19 +226,19 @@ void SFE_UBLOX_GNSS::processRTCM(uint8_t incoming)
 {
   //Let's just pretty-print the HEX values for now
  
-   static uint8_t rtk_frame_buffer[200];
+   static uint8_t rtk_frame_buffer[1024];
    static int num_bytes=0;
    if (myGNSS.rtcmFrameCounter  == 1) {      
       if(num_bytes>0){
-        memset(rtk_frame_data,0,200);
+        memset(rtk_frame_data,0,1024);
         rtk_frame_size=num_bytes;
-        memcpy(rtk_frame_data, rtk_frame_buffer, 200);  
+        memcpy(rtk_frame_data, rtk_frame_buffer, 1024);  
       }
       //reset 
-      memset(rtk_frame_buffer,0,200);
+      memset(rtk_frame_buffer,0,1024);
       num_bytes=0;
   }
-  if (myGNSS.rtcmFrameCounter < 200) {
+  if (myGNSS.rtcmFrameCounter < 1024) {
     rtk_frame_buffer[myGNSS.rtcmFrameCounter-1]=incoming;
     num_bytes++;
   }else{
