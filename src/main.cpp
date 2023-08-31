@@ -1,4 +1,4 @@
-
+#include <Arduino.h>
 #include <Wire.h> //Needed for I2C to GNSS
 #include <SPI.h>
 #include <nRF24L01.h>
