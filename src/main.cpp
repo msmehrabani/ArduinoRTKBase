@@ -8,15 +8,15 @@
 SFE_UBLOX_GNSS myGNSS;
 
 
-SFE_UBLOX_REDUCED_PROG_MEM
+// SFE_UBLOX_REDUCED_PROG_MEM
 
 //To save eprom space do uncomment the following lines in: SparkFun_u-blox_GNSS_Arduino_Library.h
-//#define SFE_UBLOX_REDUCED_PROG_MEM // Uncommenting this line will delete the minor debug messages to save memory
+#define SFE_UBLOX_REDUCED_PROG_MEM // Uncommenting this line will delete the minor debug messages to save memory
 //#define SFE_UBLOX_DISABLE_AUTO_NMEA // Uncommenting this line will disable auto-NMEA support to save memory
 
-RF24 radio(8, 7); // CE, CSN
+RF24 radio(4, 5); // CE, CSN
 
-uint8_t addresses[][6] = { "Base", "Rover" };
+uint8_t addresses[2] = { 0x66, 0x64 };//"Base", "Rover" 
 
 
 static float accuracy = 5.000; //2.0
